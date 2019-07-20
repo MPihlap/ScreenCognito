@@ -25,6 +25,7 @@ const unsigned long postingInterval = 10L * 1000L; // delay between updates, in 
 NewPing sonar(3, 4, 200);
 int btstatus = 0;
 
+const int numReadings = 10;
 int readings[numReadings];      // the readings from the analog input
 int readIndex = 0;              // the index of the current reading
 int total = 0;                  // the running total
