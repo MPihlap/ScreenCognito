@@ -9,6 +9,7 @@ import tkinter as tk
 
 if sys.platform.startswith("win"):
     from win10toast import ToastNotifier
+    toaster = ToastNotifier()
 
 def turnOffScreen():
     if sys.platform.startswith("linux"):
@@ -22,7 +23,7 @@ def turnOffScreen():
         while toaster.notification_active(): time.sleep(0.1)
         subprocess.call("turnoff.exe")
 
-prev = 17
+prev = 0 # remove me
 while True:
     link = "http://90.191.160.122/web/sodi/screencognito/data.json?fbclid=IwAR0Cc93sV1Qm-bbylcoZia2mbfoRDcgErX-P6jDQl_osostgzm79qNvjN4w"
     f = urlopen(link)
