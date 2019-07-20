@@ -9,7 +9,9 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-    <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin" />
+        <meta-data
+            android:name="android.app.device_admin"
+            android:resource="@xml/device_admin" />
         <receiver
             android:name=".DeviceAdminReceiverImpl"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
