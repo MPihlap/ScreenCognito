@@ -3,8 +3,8 @@
 #include <WiFiNINA.h>
 
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
-char ssid[] = "";        // your network SSID (name)
-char pass[] = "";    // your network password (use for WPA, or use as key for WEP)
+char ssid[] = "K48";        // your network SSID (name)
+char pass[] = "Manniku121";    // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;            // your network key Index number (needed only for WEP)
 int counter = 0;
 int status = WL_IDLE_STATUS;
@@ -23,11 +23,19 @@ unsigned long lastConnectionTime = 0;            // last time you connected to t
 const unsigned long postingInterval = 10L * 1000L; // delay between updates, in milliseconds
 
 NewPing sonar(3, 4, 200);
+int btstatus = 0;
+
+const int numReadings = 10;
+int readings[numReadings];      // the readings from the analog input
+int readIndex = 0;              // the index of the current reading
+int total = 0;                  // the running total
+int average = 0;                // the average
 
 void setup() {
   Serial.begin(9600);
   Serial1.begin(9600);
   pinMode(A1, INPUT);
+  pinMode(5, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
 
   digitalWrite(LED_BUILTIN, HIGH);
@@ -56,8 +64,13 @@ void setup() {
   printWifiStatus();
   Serial1.println("AT+IBEA0");
   Serial1.println("AT+RESET");
+  btstatus = 0;
   digitalWrite(LED_BUILTIN, LOW);
   // put your setup code here, to run once:
+
+  for (int thisReading = 0; thisReading < numReadings; thisReading++) {
+    readings[thisReading] = 0;
+  }
 
 }
 
@@ -66,9 +79,34 @@ void loop() {
   {
     Serial.write(Serial1.read());
   }
+  if (btstatus == 1){
+    digitalWrite(5, LOW);
+  } else {
+    digitalWrite(5, HIGH);
+  }
   // put your main code here, to run repeatedly:
-  //Serial.println(sonar.ping_cm());
-  //Serial.println(analogRead(A1));
+  // Serial.println(sonar.ping_cm());
+
+  // subtract the last reading:
+  total = total - readings[readIndex];
+  // read from the sensor:
+  readings[readIndex] = sonar.ping_cm();
+  // add the reading to the total:
+  total = total + readings[readIndex];
+  // advance to the next position in the array:
+  readIndex = readIndex + 1;
+
+  // if we're at the end of the array...
+  if (readIndex >= numReadings) {
+    // ...wrap around to the beginning:
+    readIndex = 0;
+  }
+
+  // calculate the average:
+  average = total / numReadings;
+  Serial.println(average);
+
+  //Serial.println(digitalRead(A1));
   WiFiClient client2 = server2.available();
   if (client2) {                             // if you get a client,
     Serial.println("new client");           // print a message out the serial port
@@ -102,10 +140,14 @@ void loop() {
         if (currentLine.endsWith("GET /1")) {
           Serial1.println("AT+IBEA1");
           Serial1.println("AT+RESET");
+          btstatus = 1;
+          httpRequest();
         }
         if (currentLine.endsWith("GET /0")) {
           Serial1.println("AT+IBEA0");
           Serial1.println("AT+RESET");
+          btstatus = 0;
+          httpRequest();
         }
       }
     }
@@ -140,7 +182,7 @@ void httpRequest() {
   if (client.connect(server, 80)) {
     Serial.println("Sending data");
     // send the HTTP PUT request:
-    client.println("GET /web/sodi/screencognito/vahendaja.php?d=" + String(counter) + " HTTP/1.1");
+    client.println("GET /web/sodi/screencognito/vahendaja.php?d=" + String(btstatus) + " HTTP/1.1");
     client.println("Host: example.org");
     client.println("User-Agent: ArduinoWiFi/1.1");
     client.println("Connection: close");
