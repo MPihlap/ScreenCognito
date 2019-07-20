@@ -2,12 +2,10 @@ package com.example.android;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
 
@@ -46,6 +44,8 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        beaconManager.removeAllRangeNotifiers();
+        beaconManager.removeAllMonitorNotifiers();
         beaconManager.unbind(this);
     }
 
@@ -80,28 +80,14 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
     public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
         if (!beacons.isEmpty()) {
             turnOffScreen();
-            finish();
         }
     }
 
     private void turnOffScreen() {
-        Intent serviceIntent = new Intent(this, ScreenService.class);
-        ServiceConnection serviceConnection = createServiceConnection();
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
-        startService(serviceIntent);
-    }
-
-    private ServiceConnection createServiceConnection() {
-        return new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder binder) {
-                Log.d("test", "onServiceConnected");
-            }
-
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                Log.d("test", "onServiceDisconnected");
-            }
-        };
+        DevicePolicyManager systemService = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        ComponentName devAdminReceiver = new ComponentName(getApplicationContext(), DeviceAdminReceiverImpl.class);
+        if (systemService.isAdminActive(devAdminReceiver)) {
+            systemService.lockNow();
+        }
     }
 }
