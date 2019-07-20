@@ -3,13 +3,17 @@ import time
 import subprocess
 
 import sys
+import warnings
+
+import tkinter as tk
 
 def turnOffScreen():
     if sys.platform.startswith("linux"):
+        subprocess.call(["notify-send", 'Hoiatus!', 'Ekraan suletakse 5 sekundi pärast'])
+        time.sleep(5)
         subprocess.call(["xset", "-display", ":0.0", "dpms", "force", "off"])
-    elif sys.platform.startswith("windows"):
+    elif sys.platform.startswith("win"):
         subprocess.call("turnoff.exe")
-
 
 prev = 17
 while True:
@@ -20,4 +24,4 @@ while True:
     if content != prev:
         prev = content
         turnOffScreen()
-    time.sleep(0.5)
+    time.sleep(0.5) 
