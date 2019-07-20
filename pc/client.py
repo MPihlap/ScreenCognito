@@ -7,12 +7,19 @@ import warnings
 
 import tkinter as tk
 
+if sys.platform.startswith("win"):
+    from win10toast import ToastNotifier
+
 def turnOffScreen():
     if sys.platform.startswith("linux"):
         subprocess.call(["notify-send", 'Hoiatus!', 'Ekraan suletakse 5 sekundi pärast'])
         time.sleep(5)
         subprocess.call(["xset", "-display", ":0.0", "dpms", "force", "off"])
     elif sys.platform.startswith("win"):
+        toaster.show_toast("Hoiatus!",
+                   "Ekraan suletakse 5 sekundi pärast",
+                   duration=5)
+        while toaster.notification_active(): time.sleep(0.1)
         subprocess.call("turnoff.exe")
 
 prev = 17
