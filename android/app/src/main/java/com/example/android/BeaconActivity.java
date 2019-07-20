@@ -2,7 +2,12 @@ package com.example.android;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
 
@@ -13,7 +18,6 @@ import org.altbeacon.beacon.BeaconParser;
 import org.altbeacon.beacon.MonitorNotifier;
 import org.altbeacon.beacon.RangeNotifier;
 import org.altbeacon.beacon.Region;
-import org.altbeacon.beacon.utils.UrlBeaconUrlCompressor;
 
 import java.util.Collection;
 
@@ -32,14 +36,10 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
         //beaconManager.setForegroundBetweenScanPeriod(0);
         //beaconManager.setForegroundScanPeriod(100);
 
+        String iBeaconPattern = "m:2-3=0215,i:4-19,i:20-21,i:22-23,p:24-24";
         beaconManager.getBeaconParsers().add(new BeaconParser()
-                .setBeaconLayout(BeaconParser.EDDYSTONE_UID_LAYOUT));
+                .setBeaconLayout(iBeaconPattern));
 
-        beaconManager.getBeaconParsers().add(new BeaconParser()
-                .setBeaconLayout(BeaconParser.EDDYSTONE_TLM_LAYOUT));
-
-        beaconManager.getBeaconParsers().add(new BeaconParser()
-                .setBeaconLayout(BeaconParser.EDDYSTONE_URL_LAYOUT));
         beaconManager.bind(this);
     }
 
@@ -78,14 +78,30 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
 
     @Override
     public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
-        for (Beacon beacon : beacons) {
-            if (beacon.getServiceUuid() == 0xfeaa && beacon.getBeaconTypeCode() == 0x10) {
-                // This is a Eddystone-URL frame
-                String url = UrlBeaconUrlCompressor.uncompress(beacon.getId1().toByteArray());
-                Log.d(TAG, "I see a beacon transmitting a url: " + url +
-                        " approximately " + beacon.getDistance() + " meters away.");
-            }
+        if (!beacons.isEmpty()) {
+            turnOffScreen();
+            finish();
         }
     }
 
+    private void turnOffScreen() {
+        Intent serviceIntent = new Intent(this, ScreenService.class);
+        ServiceConnection serviceConnection = createServiceConnection();
+        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
+        startService(serviceIntent);
+    }
+
+    private ServiceConnection createServiceConnection() {
+        return new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder binder) {
+                Log.d("test", "onServiceConnected");
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+                Log.d("test", "onServiceDisconnected");
+            }
+        };
+    }
 }

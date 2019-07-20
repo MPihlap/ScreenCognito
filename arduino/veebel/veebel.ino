@@ -3,8 +3,8 @@
 #include <WiFiNINA.h>
 
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
-char ssid[] = "K48";        // your network SSID (name)
-char pass[] = "Manniku121";    // your network password (use for WPA, or use as key for WEP)
+char ssid[] = "";        // your network SSID (name)
+char pass[] = "";    // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;            // your network key Index number (needed only for WEP)
 int counter = 0;
 int status = WL_IDLE_STATUS;
@@ -151,6 +151,7 @@ void httpRequest() {
   } else {
     // if you couldn't make a connection:
     Serial.println("connection failed");
+    printWifiStatus();
   }
 }
 

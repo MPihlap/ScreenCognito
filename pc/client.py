@@ -3,9 +3,6 @@ import time
 import subprocess
 
 import sys
-import warnings
-
-import tkinter as tk
 
 if sys.platform.startswith("win"):
     from win10toast import ToastNotifier
