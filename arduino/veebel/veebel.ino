@@ -74,23 +74,11 @@ void setup() {
 
 }
 
-void loop() {
-  if (Serial1.available())
-  {
-    Serial.write(Serial1.read());
-  }
-  if (btstatus == 1){
-    digitalWrite(5, LOW);
-  } else {
-    digitalWrite(5, HIGH);
-  }
-  // put your main code here, to run repeatedly:
-  // Serial.println(sonar.ping_cm());
-
+int getAverage(int newValue) {
   // subtract the last reading:
   total = total - readings[readIndex];
   // read from the sensor:
-  readings[readIndex] = sonar.ping_cm();
+  readings[readIndex] = newValue;
   // add the reading to the total:
   total = total + readings[readIndex];
   // advance to the next position in the array:
@@ -104,6 +92,23 @@ void loop() {
 
   // calculate the average:
   average = total / numReadings;
+  return average;
+}
+
+void loop() {
+  if (Serial1.available())
+  {
+    Serial.write(Serial1.read());
+  }
+  if (btstatus == 1){
+    digitalWrite(5, LOW);
+  } else {
+    digitalWrite(5, HIGH);
+  }
+  // put your main code here, to run repeatedly:
+  // Serial.println(sonar.ping_cm());
+
+  average = getAverage(sonar.ping_cm());
   Serial.println(average);
 
   //Serial.println(digitalRead(A1));
@@ -213,4 +218,4 @@ void printWifiStatus() {
   Serial.print("signal strength (RSSI):");
   Serial.print(rssi);
   Serial.println(" dBm");
-}
+  }
