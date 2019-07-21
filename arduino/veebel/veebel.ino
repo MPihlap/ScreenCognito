@@ -3,10 +3,12 @@
 #include <WiFiNINA.h>
 
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
-char ssid[] = "K48";        // your network SSID (name)
-char pass[] = "Manniku121";    // your network password (use for WPA, or use as key for WEP)
+char ssid[] = "";        // your network SSID (name)
+char pass[] = "";    // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;            // your network key Index number (needed only for WEP)
+
 int counter = 0;
+
 int status = WL_IDLE_STATUS;
 String message; //string that stores the incoming message
 char ch;
@@ -21,15 +23,17 @@ WiFiServer server2(80);
 
 unsigned long lastConnectionTime = 0;            // last time you connected to the server, in milliseconds
 const unsigned long postingInterval = 10L * 1000L; // delay between updates, in milliseconds
+unsigned long lastBlinkTime = 0;
 
+unsigned long lastMeasureTime = 0;
+int lastLightValue = 0;
+int lastSonarValue = 0;
+
+unsigned long lastAlertTime = 0;
+
+bool permanentAlert = false;
 NewPing sonar(3, 4, 200);
 int btstatus = 0;
-
-const int numReadings = 10;
-int readings[numReadings];      // the readings from the analog input
-int readIndex = 0;              // the index of the current reading
-int total = 0;                  // the running total
-int average = 0;                // the average
 
 void setup() {
   Serial.begin(9600);
@@ -62,15 +66,18 @@ void setup() {
   // you're connected now, so print out the status:
   server2.begin();
   printWifiStatus();
+  Serial1.println("AT+MARJ0x1234");
+  Serial1.println("AT+MINO0xFA01");
+  Serial1.println("AT+ADVI5");
+  Serial1.println("AT+NAMEVEEBEL" + ip2Str(WiFi.localIP()));
   Serial1.println("AT+IBEA0");
   Serial1.println("AT+RESET");
   btstatus = 0;
+  httpRequest();
   digitalWrite(LED_BUILTIN, LOW);
+  lastLightValue = analogRead(A1);
+  lastSonarValue = sonar.ping_cm();
   // put your setup code here, to run once:
-
-  for (int thisReading = 0; thisReading < numReadings; thisReading++) {
-    readings[thisReading] = 0;
-  }
 
 }
 
@@ -79,34 +86,64 @@ void loop() {
   {
     Serial.write(Serial1.read());
   }
-  if (btstatus == 1){
+  if (btstatus == 2) {
     digitalWrite(5, LOW);
-  } else {
+  } else if (btstatus == 1) {
+    if (millis() - lastBlinkTime > 1000L) {
+      if (digitalRead(5)) {
+        digitalWrite(5, LOW);
+      } else {
+        digitalWrite(5, HIGH);
+      }
+      lastBlinkTime = millis();
+    }
+  }  else {
     digitalWrite(5, HIGH);
   }
   // put your main code here, to run repeatedly:
-  // Serial.println(sonar.ping_cm());
-
-  // subtract the last reading:
-  total = total - readings[readIndex];
-  // read from the sensor:
-  readings[readIndex] = sonar.ping_cm();
-  // add the reading to the total:
-  total = total + readings[readIndex];
-  // advance to the next position in the array:
-  readIndex = readIndex + 1;
-
-  // if we're at the end of the array...
-  if (readIndex >= numReadings) {
-    // ...wrap around to the beginning:
-    readIndex = 0;
+  //Serial.println(sonar.ping_cm());
+  if (millis() - lastMeasureTime > 50L) {
+    int c1 = analogRead(A1);
+    int c2 = sonar.ping_cm();
+    /*Serial.print(c1-lastLightValue);
+      Serial.print(" ");
+      Serial.println(c2-lastSonarValue);*/
+    if (!permanentAlert) {
+      if (c1 - lastLightValue > 100 || c2 - lastSonarValue > 20) {
+        if (btstatus != 2) {
+          Serial1.println("AT+IBEA1");
+          Serial1.println("AT+RESET");
+          Serial.println("Device set 2");
+          btstatus = 2;
+        }
+        httpRequest();
+        lastAlertTime = millis();
+      } else if (c1 - lastLightValue > 50 || c2 - lastSonarValue > 10) {
+        if (btstatus != 1) {
+          Serial1.println("AT+IBEA1");
+          Serial1.println("AT+RESET");
+          Serial.println("Device set 1");
+          btstatus = 1;
+        }
+        httpRequest();
+        lastAlertTime = millis();
+      } else {
+        if (millis() - lastAlertTime > 5000L) {
+          if (btstatus != 0) {
+            Serial1.println("AT+IBEA0");
+            Serial1.println("AT+RESET");
+            Serial.println("Device set 0");
+            btstatus = 0;
+          }
+          httpRequest();
+          lastAlertTime = millis();
+        }
+      }
+    }
+    lastLightValue = c1;
+    lastSonarValue = c2;
+    lastMeasureTime = millis();
   }
-
-  // calculate the average:
-  average = total / numReadings;
-  Serial.println(average);
-
-  //Serial.println(digitalRead(A1));
   WiFiClient client2 = server2.available();
   if (client2) {                             // if you get a client,
     Serial.println("new client");           // print a message out the serial port
@@ -136,18 +173,32 @@ void loop() {
         } else if (c != '\r') {  // if you got anything else but a carriage return character,
           currentLine += c;      // add it to the end of the currentLine
         }
-
-        if (currentLine.endsWith("GET /1")) {
+        if (currentLine.endsWith("GET /2")) {
           Serial1.println("AT+IBEA1");
           Serial1.println("AT+RESET");
+          Serial.println("Client sent 2");
+          permanentAlert = true;
+          btstatus = 2;
+          httpRequest();
+          lastAlertTime = millis();
+        }
+        else if (currentLine.endsWith("GET /1")) {
+          Serial1.println("AT+IBEA1");
+          Serial1.println("AT+RESET");
+          Serial.println("Client sent 1");
+          permanentAlert = false;
           btstatus = 1;
           httpRequest();
+          lastAlertTime = millis();
         }
-        if (currentLine.endsWith("GET /0")) {
+        else if (currentLine.endsWith("GET /0")) {
           Serial1.println("AT+IBEA0");
           Serial1.println("AT+RESET");
+          Serial.println("Client sent 0");
+          permanentAlert = false;
           btstatus = 0;
           httpRequest();
+          lastAlertTime = millis();
         }
       }
     }
@@ -160,20 +211,10 @@ void loop() {
     char c = client.read();
     //Serial.write(c);
   }
-  // if ten seconds have passed since your last connection,
-  // then connect again and send data:
-  if (millis() - lastConnectionTime > postingInterval) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    httpRequest();
-    counter++;
-
-    //Serial1.println("AT+IBEA1");
-    //Serial1.println("AT+RESET");
-    digitalWrite(LED_BUILTIN, LOW);
-  }
 }
 
 void httpRequest() {
+  digitalWrite(LED_BUILTIN, HIGH);
   // close any connection before send a new request.
   // This will free the socket on the Nina module
   client.stop();
@@ -193,10 +234,16 @@ void httpRequest() {
   } else {
     // if you couldn't make a connection:
     Serial.println("connection failed");
+    while (status != WL_CONNECTED) {
+      Serial.print("Attempting to connect to SSID: ");
+      Serial.println(ssid);
+      // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
+      status = WiFi.begin(ssid, pass);
+    }
     printWifiStatus();
   }
+  digitalWrite(LED_BUILTIN, LOW);
 }
-
 
 void printWifiStatus() {
   // print the SSID of the network you're attached to:
@@ -213,4 +260,12 @@ void printWifiStatus() {
   Serial.print("signal strength (RSSI):");
   Serial.print(rssi);
   Serial.println(" dBm");
+}
+
+String ip2Str(IPAddress ip) {
+  String s = "";
+  for (int i = 0; i < 4; i++) {
+    s += i  ? "." + String(ip[i]) : String(ip[i]);
+  }
+  return s;
 }
