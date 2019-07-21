@@ -1,15 +1,21 @@
 package com.example.android;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.altbeacon.beacon.Beacon;
 import org.altbeacon.beacon.BeaconConsumer;
@@ -24,11 +30,14 @@ import java.util.Collection;
 public class BeaconActivity extends AppCompatActivity implements BeaconConsumer, MonitorNotifier, RangeNotifier {
 
     protected static final String TAG = "BeaconsEverywhere";
+    private static final String CHANNEL_ID = "12345";
+    private static final String CHANNEL_NAME = "VEEBEL";
     private BeaconManager beaconManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        createNotificationChannel();
         setContentView(R.layout.activity_beacon);
         beaconManager = BeaconManager.getInstanceForApplication(this.getApplicationContext());
         //beaconManager.setBackgroundBetweenScanPeriod(0);
@@ -46,6 +55,8 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        beaconManager.removeAllRangeNotifiers();
+        beaconManager.removeAllMonitorNotifiers();
         beaconManager.unbind(this);
     }
 
@@ -79,29 +90,41 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
     @Override
     public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
         if (!beacons.isEmpty()) {
-            turnOffScreen();
-            finish();
+            for (Beacon beacon : beacons) {
+                if (beacon.getBluetoothName().contains("VEEBEL") && beacon.getIdentifiers().size() >= 2) {
+                    if ("1".equals(beacon.getIdentifier(2).toString())) {
+                        Bitmap icon = BitmapFactory.decodeResource(getApplicationContext().getResources(), R.drawable.ic_launcher_foreground);
+                        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                                .setContentTitle("Hoiatus!")
+                                .setContentText("Oht läheduses, peagi lülitatakse ekraan välja!")
+                                .setStyle(new NotificationCompat.BigPictureStyle().bigPicture(icon))
+                                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+                        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+                        notificationManager.notify(1, builder.build());
+                    } else if ("2".equals(beacon.getIdentifier(2).toString())) {
+                        turnOffScreen();
+                    }
+                }
+            }
+        }
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance);
+            channel.setDescription("DESCRIPTION");
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
         }
     }
 
     private void turnOffScreen() {
-        Intent serviceIntent = new Intent(this, ScreenService.class);
-        ServiceConnection serviceConnection = createServiceConnection();
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
-        startService(serviceIntent);
-    }
-
-    private ServiceConnection createServiceConnection() {
-        return new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder binder) {
-                Log.d("test", "onServiceConnected");
-            }
-
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                Log.d("test", "onServiceDisconnected");
-            }
-        };
+        DevicePolicyManager systemService = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        ComponentName devAdminReceiver = new ComponentName(getApplicationContext(), DeviceAdminReceiverImpl.class);
+        if (systemService.isAdminActive(devAdminReceiver)) {
+            systemService.lockNow();
+        }
     }
 }
