@@ -86,5 +86,6 @@ public class MainActivity extends AppCompatActivity {
     private void scanBeacons() {
         Intent intent = new Intent(this, BeaconActivity.class);
         startActivity(intent);
+        finish();
     }
 }

@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.util.Log;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.altbeacon.beacon.Beacon;
@@ -33,6 +34,7 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
     private static final String CHANNEL_ID = "12345";
     private static final String CHANNEL_NAME = "VEEBEL";
     private BeaconManager beaconManager;
+    private TextView tvStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,19 +47,22 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
         //beaconManager.setForegroundBetweenScanPeriod(0);
         //beaconManager.setForegroundScanPeriod(100);
 
+        tvStatus = findViewById(R.id.tvBeaconStatus);
+
         String iBeaconPattern = "m:2-3=0215,i:4-19,i:20-21,i:22-23,p:24-24";
-        beaconManager.getBeaconParsers().add(new BeaconParser()
-                .setBeaconLayout(iBeaconPattern));
+        beaconManager.getBeaconParsers().add(new BeaconParser().setBeaconLayout(iBeaconPattern));
 
         beaconManager.bind(this);
+        tvStatus.setText("Bound");
     }
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
+
         beaconManager.removeAllRangeNotifiers();
         beaconManager.removeAllMonitorNotifiers();
         beaconManager.unbind(this);
+        super.onDestroy();
     }
 
     @Override
@@ -65,6 +70,7 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
         Region region = new Region("all-beacons-region", null, null, null);
         try {
             beaconManager.startRangingBeaconsInRegion(region);
+            tvStatus.setText("Started ranging...");
         } catch (RemoteException e) {
             e.printStackTrace();
         }
@@ -89,21 +95,33 @@ public class BeaconActivity extends AppCompatActivity implements BeaconConsumer,
 
     @Override
     public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
+        tvStatus.setText("Did range " + beacons.size() + " " + System.currentTimeMillis()%20000);
         if (!beacons.isEmpty()) {
             for (Beacon beacon : beacons) {
-                if (beacon.getBluetoothName().contains("VEEBEL") && beacon.getIdentifiers().size() >= 2) {
-                    if ("1".equals(beacon.getIdentifier(2).toString())) {
-                        Bitmap icon = BitmapFactory.decodeResource(getApplicationContext().getResources(), R.drawable.ic_launcher_foreground);
-                        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                                .setContentTitle("Hoiatus!")
-                                .setContentText("Oht läheduses, peagi lülitatakse ekraan välja!")
-                                .setStyle(new NotificationCompat.BigPictureStyle().bigPicture(icon))
-                                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
-                        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
-                        notificationManager.notify(1, builder.build());
-                    } else if ("2".equals(beacon.getIdentifier(2).toString())) {
-                        turnOffScreen();
+                if(beacon.getIdentifiers().size() >= 2) {
+                    String minor = beacon.getIdentifier(2).toString(); // Alert level
+                    String major = beacon.getIdentifier(1).toString(); // Motion level
+                    String uuid = beacon.getIdentifier(0).toString();
+
+
+
+                    if (uuid.equals("4660x4d6fc88b-be75-6698-da48-6866a36ec78e")) {
+                        tvStatus.append("\n\nAlert level: " + minor + " Movement amount: " + major + " (" + beacon.getBluetoothName() + ")");
+                        if (minor.equals("1")) {
+                            Bitmap icon = BitmapFactory.decodeResource(getApplicationContext().getResources(), R.drawable.ic_launcher_foreground);
+                            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                                    .setContentTitle("Hoiatus!")
+                                    .setContentText("Oht läheduses, peagi lülitatakse ekraan välja!")
+                                    .setStyle(new NotificationCompat.BigPictureStyle().bigPicture(icon))
+                                    .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+                            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+                            notificationManager.notify(1, builder.build());
+                        } else if (minor.equals("2")) {
+                            turnOffScreen();
+                        }
+                    }else{
+                        tvStatus.append("\n\nUnknown uuid found: " + uuid);
                     }
                 }
             }
